@@ -196,12 +196,12 @@ pnpm add yibinthesis-dsh
 node --test --test-timeout=120000 "tests/**/*.test.mjs"
 ```
 
-**82 个用例**，按关注点分文件（`tests/`）：
+**84 个用例**，按关注点分文件（`tests/`）：
 
 | 文件 | 用例 | 守住什么 |
 | --- | ---: | --- |
 | `contract.test.mjs` | 17 | package.json / patch / vendor / 注册面自洽；技能 frontmatter 在 CRLF·BOM 下不退化 |
-| `client-render.test.mjs` | 19 | 真渲染（非快照）：逐项内容断言、**组件抛错必须可见**、缓存跨卸载、目录优先级、写面恰好一个 |
+| `client-render.test.mjs` | 21 | 真渲染（非快照）：逐项内容断言、**组件抛错必须可见**、缓存跨卸载、目录优先级、写面恰好一个 |
 | `bridge.test.mjs` | 16 | 路由全集、写白名单、**非法输入不得落盘**、写回保真（其余字段原样） |
 | `toolchain.test.mjs` | 10 | 工具链发现优先级、PATH 去重、版本校验 |
 | `local-toolbuilder.test.mjs` | 8 | 自带 `defineTool` 与宿主真 DSL 的等价性 |
@@ -222,8 +222,38 @@ yibinthesis-dsh/
 ├── vendor/yibinthesis/  随包模板运行时
 ├── scripts/             校对脚本（check_han.py）
 ├── docs/                架构与安装
-└── tests/               82 个测试
+└── tests/               84 个测试
 ```
+
+## 发布（维护者）
+
+```powershell
+# 1) 先跑测试与打包
+npm test
+npm pack                       # 产出 yibinthesis-dsh-<version>.tgz
+
+# 2) 发布（用绝对路径指向 tarball，避免工作目录不对导致发错包）
+npm publish "<仓库绝对路径>\yibinthesis-dsh-<version>.tgz"
+```
+
+**务必用 Automation token，不要用交互式 2FA。** 交互式流程会走「暂存发布」，
+一旦在浏览器确认环节中断，registry 上会留下 `0.0.0-stage` 占位存根占住
+`dist-tags.latest`，后续发布会报 `E409 Cannot publish over previously staged version`。
+Automation token 让 `npm publish` 变成非交互的一次性操作：
+
+```
+# %USERPROFILE%\.npmrc
+//registry.npmjs.org/:_authToken=<Automation token>
+```
+
+**不要 `npm unpublish`**：删除后 npm 会锁定该包名 **24 小时**不允许重发
+（`E403 cannot be republished until 24 hours have passed`），期间无任何办法绕过
+——换版本号也不行，限制在**包名**上。
+
+> 踩过的坑：曾在 `C:\Users\<你>`（那里另有一个存储依赖用的 `package.json`）里执行
+> `npm publish`，npm 把它当包根，扫到受保护的
+> `AppData\Local\ElevatedDiagnostics` 而报 `EPERM scandir`。
+> **发布前确认工作目录是仓库根**（`npm pkg get name` 应回 `yibinthesis-dsh`）。
 
 ## 授权
 
