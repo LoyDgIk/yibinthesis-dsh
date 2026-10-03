@@ -1,0 +1,24 @@
+# yibinthesis-dsh bundle patch（DSH 原生插件）
+#
+# ⚠️ 这一行**不能删**：官方约定是「组合包的 patch 必须插入一行 name = 本包包名」，
+#    loader 按**包名**（而不是相对源码路径）解析到 `package.json#main` → `lib/index.js`，
+#    由入口注册技能与原生工具。`package.json#main` **不会**因为「包被列进 profile 的 bundles」
+#    就自动执行——**patch 里的行才是会被 import 的东西**。
+#
+# ⚠️ 客户端半**不需要**在这里挂行：它由 `package.json#dsh.client`（platform + inject）
+#    驱动，而客户端 bundle 走 `exports["./client"]`。在此为客户端加行是无效的。
+#
+# 行 id 选择 `yibinthesis`：客户端面板注册进 keyed 槽位 `plugins.row.config` 时，
+# key 的规则是 `<包名>#<本 patch 里声明的行 id>`，即 `yibinthesis-dsh#yibinthesis`。
+#
+# 本行**有 Config**（见 `lib/index.js` 的 `Config`）。需要覆盖时在此加 config，例如：
+#   - id: yibinthesis
+#     name: yibinthesis-dsh
+#     config:
+#       templateRoot: 'E:\文档\毕业论文\YibinThesis'
+#       cliRoot: 'E:\文档\毕业论文\YibinThesis'
+#       toolchainDirs: ['E:\文档\毕业论文\YibinThesis\.tools']
+# 非法配置会在**加载期**响亮失败（Cordis 用 standard-schema 校验），不会静默回落默认值。
+- insert:
+    - id: yibinthesis
+      name: yibinthesis-dsh

@@ -1,0 +1,26 @@
+# 本地工具链二进制（Tectonic / Biber / Pandoc，约 250 MB）。
+# 它们**刻意不进 npm 包**（package.json 的 files 已排除），只是本机为了让
+# build.ps1 能在 PATH 上找到它们而投放的副本。
+.tools/
+
+# 契约侦察阶段的产物：从 npm registry 解包出来的第三方包副本（DSH 宿主包等），
+# 用于在本地核对官方契约与等价比对测试。属于研究中间物，不随仓库分发。
+# 缺了它，相关测试会自动跳过（见 tests/real-dsh-tools.test.mjs 的 skip 守卫）。
+_scratch/
+
+# 运行时自检：桥挂载后由 host 半写入，含本机路径与路由清单。
+# 是诊断产物，不是源文件。
+diag-bridge.json
+
+node_modules/
+*.tgz
+__pycache__/
+*.pyc
+*.log
+dist/
+
+# 编辑器 / 系统噪声
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

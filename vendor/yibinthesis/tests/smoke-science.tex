@@ -1,0 +1,100 @@
+% !TeX program = xelatex
+\documentclass[science,nobibliography]{yibinthesis}
+
+\yibinsetup{
+  title   = {理工农医编号测试},
+  author  = {测试作者},
+  college = {测试学院},
+  major   = {测试专业}
+}
+\addbibresource{ignored-in-nobibliography-mode.bib}
+
+\makeatletter
+\newcommand{\yibinassertheadingindent}[1]{%
+  \if@afterindent\else
+    \PackageError{yibinthesis-smoke}{#1 suppresses the following paragraph indent}{}
+  \fi
+  \ifdim\parindent=2em\relax\else
+    \PackageError{yibinthesis-smoke}{#1 changed parindent from two em}{}
+  \fi
+}
+\newcommand{\yibinassertcounter}[3]{%
+  \begingroup
+    \edef\yibinactual{#2}%
+    \def\yibinexpected{#3}%
+    \ifx\yibinactual\yibinexpected\else
+      \PackageError{yibinthesis-smoke}{#1 expected #3 but got \yibinactual}{}
+    \fi
+  \endgroup
+}
+\makeatother
+
+\begin{document}
+\mainmatter
+\yibinopeningchapter
+\yibinassertheadingindent{Science opening chapter}
+\section{绪论中的编号小节}\label{sec:science-intro}
+\yibinassertheadingindent{Science opening section}
+\yibinassertcounter{Science opening section number}{\thesection}{1.1}
+本段用于防止未编号绪论产生 0.1。
+
+\chapter{一级标题}\label{chap:science-first}
+\yibinassertheadingindent{Science chapter}
+本段检查理工农医一级标题后的首段仍然保留两个汉字的首行缩进。
+
+\section{二级标题}
+\yibinassertheadingindent{Science section}
+本段检查理工农医二级标题后的首段仍然保留两个汉字的首行缩进。
+
+\subsection{三级标题}
+\yibinassertheadingindent{Science subsection}
+本段检查理工农医三级标题后的首段仍然保留两个汉字的首行缩进。
+
+\subsubsection{四级标题}
+\yibinassertheadingindent{Science subsubsection}
+本段检查理工农医四级标题后的首段仍然保留两个汉字的首行缩进。
+
+\begin{table}[htbp]
+  \centering
+  \caption{表格编号测试}
+  \label{tab:science-first}
+  \yibinassertcounter{Science table number}{\thetable}{2.1}
+  \begin{tabular}{ll}
+    \toprule
+    项目 & 内容 \\
+    \midrule
+    一 & 测试 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\rule{0pt}{2cm}\rule{5cm}{0pt}}
+  \caption{插图编号测试}
+  \label{fig:science-first}
+  \yibinassertcounter{Science figure number}{\thefigure}{2.1}
+\end{figure}
+
+\begin{equation}
+  y=f(x).
+  \label{eq:science-first}
+  \yibinassertcounter{Science first equation number}{\theequation}{2.1}
+\end{equation}
+
+\chapter{跨章编号测试}
+\yibinassertheadingindent{Second science chapter}
+\begin{equation}
+  z=g(x).
+  \label{eq:science-second}
+  \yibinassertcounter{Science second equation number}{\theequation}{3.1}
+\end{equation}
+
+引用测试：第\ref{sec:science-intro}节、表\ref{tab:science-first}、
+图\ref{fig:science-first}、式\eqref{eq:science-first}和式\eqref{eq:science-second}。
+
+\yibinclosingchapter
+\yibinassertheadingindent{Science closing chapter}
+\yibinassertcounter{Science closing chapter must not advance the chapter counter}{\thechapter}{3}
+这是无编号结论测试；结论应由类文件写入目录，但不得显示为第 4 章。
+\end{document}

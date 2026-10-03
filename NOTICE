@@ -1,0 +1,37 @@
+NOTICE
+======
+
+## 本包的来源与授权边界
+
+`yibinthesis-dsh` 是 **DeepSeek Harness 插件包装层**，它本身采用 MIT License（见 `LICENSE`）。
+
+包内的 `vendor/yibinthesis/` 目录**逐字复制**自上游项目 **YibinThesis**
+（`E:\文档\毕业论文\YibinThesis`，MIT License）。复制的原因见 `docs/ARCHITECTURE.md` D2：
+上游的 `build.ps1` 用「脚本自身所在仓库根」解析 `lib/build_word.py`、`word/reference.docx`
+与 `yibinthesis.cls`，因此这些文件必须随插件一起分发，插件才能独立完成构建。
+
+上游 MIT 许可证与 `NOTICE` 原文一并保留在 `vendor/yibinthesis/LICENSE` 与
+`vendor/yibinthesis/NOTICE`，其条款对本包同样适用。
+
+## 不随 MIT 授权的内容（重要）
+
+**校名、校徽、校名字样及其他机构标识不包含在 MIT 授权范围内。**
+
+`vendor/yibinthesis/assets/yibin-university-logo.png` 等机构标识仅随上游模板用于
+宜宾学院毕业材料的**本地排版**用途。任何再分发、再发布或商业使用，都必须自行确认
+是否获得相应机构的许可。上游 `NOTICE` 对此有原文说明，请一并阅读。
+
+## 本包不分发的内容
+
+以下内容**刻意**不随本包分发（体积与许可原因，见 `docs/ARCHITECTURE.md` D2/D3）：
+
+- 第三方排版工具二进制（Tectonic / Biber / Pandoc）：上游 `.tools/` 目录合计约 **304 MB**。
+  本包改为**探测**它们的位置（环境变量 → 项目 `.tools/` → `PATH`），缺失时如实报告。
+- 上游的 `examples/`（只读回归夹具）、`lib/tests/`（上游测试）。
+- 上游的 `lib/yibinthesis_cli/`（CLI 脚手架源码）。本包的 `yibinthesis_new` 工具
+  **在运行时复用**用户自己的上游检出（配置项 `cliRoot`），而不是复制一份会漂移的实现。
+
+## 非官方声明
+
+本工具是**非官方**实现。学校、学院或专业发布的新通知**优先于**本工具，
+提交前仍需由指导教师或所在学院复核。
