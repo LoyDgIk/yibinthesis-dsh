@@ -1,6 +1,6 @@
 {
   "name": "yibinthesis-dsh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "YibinThesis — 宜宾学院本科毕业材料（毕业论文/开题报告/文献综述）的 LaTeX 排版工具，作为 DeepSeek Harness 原生插件：注册 yibinthesis_* 原生工具（项目摘要 / 工具链检查 / 脚手架 / PDF 与 DOCX 构建 / 格式检查 / 清理）、按需加载的 yibinthesis 技能，以及一个 Web GUI 工具链状态与构建面板。",
   "type": "module",
   "main": "lib/index.js",
