@@ -6,91 +6,86 @@
 
 > 本工具是**非官方**实现。学校、学院或专业的新通知优先于本工具；提交前仍需由指导教师或所在学院复核。
 
-## 它解决什么
+## 功能范围
 
-上游 `YibinThesis` 是一个 Python CLI + PowerShell 构建器 + LaTeX 文档类。
-它在终端里很好用，但一个 AI 助手要用它，得先搞清楚：项目在哪、是哪类文档、缺哪个排版工具、
-失败到底是配置错还是环境错。本插件把这些问题变成**结构化调用**：
+上游 `YibinThesis` 由 Python CLI、PowerShell 构建器与 LaTeX 文档类组成，在终端中可用，
+但助手调用时需先确定：项目位置、文档类型、缺失的排版工具，以及失败源于配置还是环境。
+本插件将这些判断转化为**结构化调用**：
 
 | 工具 | 用途 | 只读 |
 | --- | --- | :---: |
 | `yibinthesis_probe` | 项目摘要：配置、入口与文档类型、封面元数据、章节与汉字数、交付路径 | ✅ |
-| `yibinthesis_doctor` | 工具链就绪度 + **缺什么、怎么补** | ✅ |
+| `yibinthesis_doctor` | 工具链就绪度，并指出缺项与补法 | ✅ |
 | `yibinthesis_new` | 新建项目骨架（支持 `dry_run` 预览） | ❌ |
 | `yibinthesis_build` | 构建 PDF / DOCX | ❌ |
 | `yibinthesis_check` | 结构与格式检查 | ❌ |
 | `yibinthesis_clean` | 清理构建产物 | ❌ |
 
-外加技能 `yibinthesis`（渐进披露）与一个状态面板（除「设置产物输出名称」外只读）。
+另含渐进披露技能 `yibinthesis`，以及一个状态面板（除「设置产物输出名称」外只读）。
 
 ## 状态面板
 
-**入口：会话右侧栏的「论文工具」标签页** —— 与「工作区文件 / 上下文 / 新建终端 / 浏览器」同列。
+**入口：会话右侧栏的「论文工具」标签页**，与「工作区文件 / 上下文 / 新建终端 / 浏览器」同列。
 另有备用入口：**插件 → 已安装 → `yibinthesis-dsh` → 该行的「配置」**（`plugins.row.config`）。
 
-位置为什么是这里（走过两次弯路，记下来避免重犯）：
+### 位置选型依据
 
-1. 最初只挂 `plugins.row.config` —— 要走「插件 → 已安装 → 找到该行 → 点『配置』」三步，
-   中途点到插件名还会先落到宿主自动生成的插件信息页。用户反馈：**「面板在哪」**。
-2. 改挂应用级侧栏 `sidebar.panellist` + `main` —— 找得到了，但**层级错了**：这个面板讲的是
-   **当前会话的论文项目**，属于会话级 UI，不该和「插件 / 技能中心」并列。
-   用户反馈：**「这个面板不应该在会话窗口的顶栏或侧栏吗？」**
-3. 现方案：按 `dsh-context`（同为第三方、同为会话级面板）实测的写法注册到**会话右侧栏**，
-   三件配对、共用同一个 id：
+面板承载的是**当前会话的论文项目**，属于会话级 UI，因此注册到会话右侧栏，
+而不是与「插件 / 技能中心」并列的应用级侧栏。注册由三处配对完成，共用同一 id：
 
-   | 作用 | 注册点 |
-   | --- | --- |
-   | 声明标签条目（含图标；没有它标签不出现） | `ctx.inject(['sidebarRightTabs'])` → `sidebarRightTabs.register({ id, kind, title, icon })` |
-   | 标签正文 | 槽位 `sidebar.right.pane.tab`，key = id |
-   | 标签标题头 | 槽位 `sidebar.right.pane.tab.title`，key = id |
+| 作用 | 注册点 |
+| --- | --- |
+| 声明标签条目（含图标；缺此项标签不出现） | `ctx.inject(['sidebarRightTabs'])` → `sidebarRightTabs.register({ id, kind, title, guide })` |
+| 标签正文 | 槽位 `sidebar.right.pane.tab`，key = id |
+| 标签标题头 | 槽位 `sidebar.right.pane.tab.title`，key = id |
 
-这套配对由 `tests/contract.test.mjs` 的「★ 客户端半：必须注册会话右侧栏标签」与
-`tests/client-render.test.mjs`（真渲染 + 逐项内容断言 + 抛错可见性）机械守住。
+该配对由 `tests/contract.test.mjs` 的「客户端半：必须注册会话右侧栏标签」与
+`tests/client-render.test.mjs`（真渲染 + 逐项内容断言 + 抛错可见性）机械保证。
 
-它回答三个问题：
+### 呈现内容
 
-1. **我的论文现在什么状态** —— 题目 / 作者 / 学号 / 年级 / 院系 / 导师、文档类型与学科、章节文件数、
-   正文字数；并列出**论文文件清单**（按用途分「正文 / 资源 / 数据 / 文档」标签页，正文每章带汉字数，
-   点击即在右侧栏预览）与两份交付物各自**是否已生成、多大、什么时候生成的**（已生成的**可点击打开**）。
+1. **项目状态**：题目 / 作者 / 学号 / 年级 / 院系 / 导师、文档类型与学科、章节文件数、
+   正文字数；**论文文件清单**（按用途分「正文 / 资源 / 数据 / 文档」标签页，正文每章附汉字数，
+   点击即在右侧栏预览）；两份交付物的**存在性、体积与生成时间**，已生成者可直接打开。
 
-   > **一个会话可有多篇文档**。毕业论文、开题报告、文献综述是 `yibinthesis_new` 的三种
-   > `documentType`，各为**独立项目**，因此面板维护的是**项目列表**（点条目切换、`×` 移除；
-   > 移除只动列表，不删磁盘文件）。列表**按会话保存**，初始为**空**——`defaultProjectDir`
-   > 在本部署刻意留空，避免每个新窗口都凭空指向同一个项目。
-   > 助手可用 `yibinthesis_new` 直接建项目，或用任一工具的 `project_dir` 参数指定路径。
+   > **一个会话可承载多篇文档。** 毕业论文、开题报告、文献综述对应 `yibinthesis_new` 的三种
+   > `documentType`，各为独立项目，因此面板维护的是**项目列表**（点条目切换，`×` 从列表移除，
+   > 不删除磁盘文件）。列表**按会话持久保存**，初始为空——`defaultProjectDir` 在本部署
+   > 刻意留空，以免每个新会话都指向同一项目。助手可用 `yibinthesis_new` 建项目，
+   > 或用任一工具的 `project_dir` 参数指定路径。
 
-   > **为什么文件要分类**：实测一个真实论文项目有 **148 个文件**——`latex/assets/` 52 张图与中间件、
-   > `图表资源/` 44、`plan/` 26、`tmp/` 10，而**正文只有 13 个 `.tex`**。混成一个列表时正文会被资源
-   > 淹没（用户反馈「资产目录和正文混在一起」）。分类判据是**用途**而非扩展名，见
-   > `categorizeProjectFile()`；「资源」页按**目录聚合**显示，不铺开上百行。
-2. **这台机器能不能出 PDF / DOCX** —— 工具链逐项就绪度（Tectonic / Biber 版本 / Pandoc / Python /
-   python-docx / Pillow），带 `exit 0/2` 与可按需展开的原始输出。
-3. **当前生效的是哪套配置** —— `templateRoot`、`cliRoot`、`toolchainDirs`、`defaultProjectDir`。
+   > **文件分类的必要性。** 实测样本含 **148 个文件**：`latex/assets/` 52（插图与中间件）、
+   > `图表资源/` 44、`plan/` 26、`tmp/` 10，而**正文仅 13 个 `.tex`**。合并展示时正文会被资源淹没。
+   > 分类判据为**用途**而非扩展名，实现见 `categorizeProjectFile()`；
+   > 「资源」页按**目录聚合**呈现，不逐条展开。
+2. **工具链就绪度**：Tectonic / Biber 版本 / Pandoc / Python / python-docx / Pillow 逐项状态，
+   附 `exit 0/2` 与可按需展开的原始输出。
+3. **生效配置**：`templateRoot`、`cliRoot`、`toolchainDirs`、`defaultProjectDir`。
 
 ### 路由与写面
 
-**为什么不从面板触发构建**：通过 Web 路由编译会让权限面过大（任何能访问该端口的页面都能让宿主编译写盘）。
-构建与脚手架一律由助手经 `yibinthesis_build` / `yibinthesis_new` 发起，走正常的工具审批与取消链路。
+面板不触发构建：经 Web 路由调用编译会显著扩大权限面（任何能访问该端口的页面均可让宿主写盘）。
+构建与脚手架一律由助手经 `yibinthesis_build` / `yibinthesis_new` 发起，受正常的工具审批与取消链路约束。
 
-桥现有 5 条路由，其中**只有一条可写**：
+桥暴露 5 条路由，其中**仅一条可写**：
 
 | 路由 | 方法 | 作用 |
 | --- | --- | --- |
 | `/state` | GET | 插件配置与项目概况 |
-| `/probe` | GET | 结构化项目摘要（走 Python 适配器） |
+| `/probe` | GET | 结构化项目摘要（经 Python 适配器） |
 | `/deliverables` | GET | 交付物存在性 / 体积 / 时间 |
 | `/deliverables` | **POST** | **设置产物输出名称**（唯一写操作，由用户点击触发） |
-| `/files` | GET | 论文源文件清单（跳过构建产物目录） |
+| `/files` | GET | 项目文件清单（跳过构建产物目录） |
 | `/doctor` | GET | 工具链就绪度 |
 
-写路由必须**显式登记**在 `BRIDGE_WRITE_ROUTES` 里；`tests/bridge.test.mjs` 断言「除白名单外一律只读」，
-`tests/client-render.test.mjs` 断言**客户端写调用恰好只有一个**、且必须挂在点击处理器里（不得在 effect 中自动执行）。
-新增写操作会被这两条测试强制要求同步更新白名单——不会因为「顺手加个 POST」而无声扩大写面。
+写路由必须**显式登记**于 `BRIDGE_WRITE_ROUTES`。`tests/bridge.test.mjs` 断言「除白名单外一律只读」；
+`tests/client-render.test.mjs` 断言客户端写调用**恰好一处**、必须挂在点击处理器上、且不得在 effect 中自动执行。
+新增写操作会被这两条测试强制要求同步更新白名单。
 
 ## 设计取舍：薄桥，不重写
 
-上游是「Node 管编排、Python 与 PowerShell 管排版」。本插件**不**把 53 KB 的 `build.ps1`
-和 280 KB 的 Word 模块移植到 JS——那只会引入回归风险。插件的职责是**探测、校验、编排、结构化**：
+上游的分工是「PowerShell 与 Python 管排版」。本插件**不**将 53 KB 的 `build.ps1`
+与 280 KB 的 Word 模块移植到 JS——那只会引入回归风险。插件职责限于**探测、校验、编排、结构化**：
 
 ```
 DSH 工具调用
@@ -122,32 +117,43 @@ pnpm add yibinthesis-dsh
 
 只想用模板运行时、不装插件也可以：直接用上游 [`YibinThesis`](https://github.com/) 仓库的 `build.ps1`。
 
-## 上游已知缺陷
+## 与上游的兼容性
 
-本插件在联调中发现**上游 YibinThesis 有两处独立缺陷**，都会让 Word/DOCX 链路失败。
-两处都**已用未改动的上游仓库复现**，不是本插件引入的，本插件也不代修上游排版逻辑。
+本插件随包携带 YibinThesis 模板运行时的发布快照（见 `vendor/yibinthesis/`）。
+该快照为 **commit `c453a26`**，与上游 `lib/` 下 33 个共有文件逐字节一致。
 
-### 缺陷 1：`word_core` 有 4 个名字永远不会被绑定 —— **上游已修复 ✅**
+联调期间曾在上游发现两处导致 DOCX 链路失败的缺陷。**两处均已由上游修复并并入本快照**，
+本插件不代修上游排版逻辑，此处记录仅用于说明快照版本与验证依据。
 
-- `lib/word_oxml.py:8-13` 的 `bind_core(core)` 把 `word_core` 的名字并入 `word_oxml`；
-- `lib/word_core.py` 的 `_bind_oxml_module()` 再把合并后的**私有**名字注回 `word_core`，原先**排除**了
-  `_build_front_matter` / `_build_cover_page` / `_build_originality_page` / `_build_authorization_page`；
-- 而这 4 个函数**只存在于 `word_oxml.py`**（`:513/638/711/777`），`word_core.py` 里从未定义过；
-- 于是 `postprocess_docx()` 以**裸名**调用时 → `NameError: name '_build_front_matter' is not defined`。
+### 已修复：`word_core` 的私有 OOXML 函数未绑定
 
-**上游修复**：删除该排除集合，改为绑定全部私有 OOXML 函数（`_bind_oxml_module()` 现在只判
-`name.startswith("_")`）。随包副本已同步该修复，**实测不再报 `NameError`**。
+`lib/word_oxml.py` 通过 `bind_core(core)` 将自身名字并入 `word_core`；`lib/word_core.py`
+的 `_bind_oxml_module()` 再将合并后的私有名字注回 `word_core`。原实现在注回时排除了
+`_build_front_matter`、`_build_cover_page`、`_build_originality_page`、`_build_authorization_page`
+四个名字，而它们**只在 `word_oxml.py` 中定义**，`word_core.py` 中并不存在。
+因此 `postprocess_docx()` 以裸名调用时触发 `NameError`。
 
-### 缺陷 2：论文路径注入的分节标记无人消费（**仍在修**）
+**上游修复**：注回条件改为 `name.startswith("_")`，即绑定全部私有 OOXML 函数。
 
-- `word_core.py:3066/3073/3075` 在**论文**路径上也注入 `SECTION_REVIEW_REFERENCES` 与 `SECTION_REVIEW_TAIL`；
-- 消费（移除）它们的代码在 `word_profiles.py:505-526`，属于 `_postprocess_review_docx`——**只服务文献综述**；
-- 因此 `word_core.py:2743-2749` 的「后处理标记未清理」守卫必然抛错。
+### 已修复：分节标记的注入点与消费点不同源
 
-**结论**：**在缺陷 2 修复前，论文类文档无法产出 DOCX。**
-**PDF 输出不受影响**——它是版式主输出，本插件已实测通过（157 KB，`%PDF-1.5`），
-`doctor`、`probe`、`clean` 以及模板回归冒烟也都正常工作。
-`yibinthesis_build` 检测到该错误时会返回 `kind: 'upstream-word-defect'` 并给出同一份诊断。
+原实现在 `word_core.py` 的**论文**构建路径上注入 `SECTION_REVIEW_REFERENCES` 与
+`SECTION_REVIEW_TAIL` 两个内部标记，而清理它们的代码位于 `word_profiles.py` 的
+`_postprocess_review_docx()`，**只服务于文献综述**。两者不同源，导致
+`word_core.py` 的「后处理标记未清理」守卫必然抛错。
+
+**上游修复**：将三处标记注入移入 `word_profiles.py` 的非论文构建路径，与消费点同处一文件。
+
+### 本插件的验证结论
+
+| 链路 | 结果 |
+| --- | --- |
+| PDF | ✅ 通过（示例项目产出 163.2 KB，`%PDF-1.5`） |
+| DOCX | ✅ 通过（示例项目产出 62.8 KB，`PK` 魔数；`word/document.xml` 中两个内部标记均已清理） |
+| 模板回归 | ✅ 通过（`yibinthesis_check` 的冒烟夹具） |
+
+若使用自定义 `templateRoot` 指向**较旧**的上游检出，上述缺陷可能仍然存在；
+`yibinthesis_build` 检测到相应症状时会返回 `kind: 'upstream-word-defect'` 并附诊断。
 
 ## 工具链：本包**不分发**排版二进制
 
@@ -236,24 +242,24 @@ npm pack                       # 产出 yibinthesis-dsh-<version>.tgz
 npm publish "<仓库绝对路径>\yibinthesis-dsh-<version>.tgz"
 ```
 
-**务必用 Automation token，不要用交互式 2FA。** 交互式流程会走「暂存发布」，
-一旦在浏览器确认环节中断，registry 上会留下 `0.0.0-stage` 占位存根占住
-`dist-tags.latest`，后续发布会报 `E409 Cannot publish over previously staged version`。
-Automation token 让 `npm publish` 变成非交互的一次性操作：
+**必须使用 Automation token，不要使用交互式 2FA。** 交互式流程走「暂存发布」：
+若在浏览器确认环节中断，registry 会残留 `0.0.0-stage` 占位存根并占据
+`dist-tags.latest`，其后发布会报 `E409 Cannot publish over previously staged version`。
+Automation token 使 `npm publish` 成为非交互的单次操作：
 
 ```
 # %USERPROFILE%\.npmrc
 //registry.npmjs.org/:_authToken=<Automation token>
 ```
 
-**不要 `npm unpublish`**：删除后 npm 会锁定该包名 **24 小时**不允许重发
-（`E403 cannot be republished until 24 hours have passed`），期间无任何办法绕过
-——换版本号也不行，限制在**包名**上。
+**不要执行 `npm unpublish`**：删除后 npm 会锁定该包名 **24 小时**不允许重发
+（`E403 cannot be republished until 24 hours have passed`）。该限制作用于**包名**，
+更换版本号无法绕过。
 
-> 踩过的坑：曾在 `C:\Users\<你>`（那里另有一个存储依赖用的 `package.json`）里执行
-> `npm publish`，npm 把它当包根，扫到受保护的
-> `AppData\Local\ElevatedDiagnostics` 而报 `EPERM scandir`。
-> **发布前确认工作目录是仓库根**（`npm pkg get name` 应回 `yibinthesis-dsh`）。
+**发布前确认工作目录为仓库根**（`npm pkg get name` 应返回 `yibinthesis-dsh`）。
+用户主目录下若存在用于存放依赖的 `package.json`，在其中执行 `npm publish`
+会使 npm 将该目录当作包根并遍历，进而扫到受保护的系统目录
+（`AppData\Local\ElevatedDiagnostics`）而报 `EPERM scandir`。
 
 ## 授权
 
