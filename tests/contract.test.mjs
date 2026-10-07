@@ -15,10 +15,12 @@ const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const { installTools } = await import('../lib/tools.js')
 // 本包自带的零依赖 defineTool（运行期用它，不用宿主包——理由见 lib/tool-builder.js）。
 const { defineTool: localDefineTool, compilePropertyMap } = await import('../lib/tool-builder.js')
-const { apply, splitFrontmatter, resolveConfig, validateConfig, CONFIG_DEFAULTS } = {
+const { apply, splitFrontmatter, loadSkills: loadSkillsFrom, resolveConfig, validateConfig, CONFIG_DEFAULTS } = {
   ...(await import('../lib/index.js')),
   ...(await import('../lib/config.js')),
 }
+// 技能枚举的根目录：新增技能是「放一个目录」，故测试直接针对该根目录操作。
+const { SKILLS_ROOT } = await import('../lib/env.js')
 
 /**
  * 把本包自带的 `defineTool` 包一层，记录每次定义时收到的 options，便于断言。
@@ -125,18 +127,72 @@ test('Config：默认值可解析，未知键与类型错误响亮失败', () =>
   assert.throws(() => resolveConfig({ quiet: 'yes' }), /config 非法/)
 })
 
-test('入口：注册技能，且技能 frontmatter 被正确解析', () => {
+test('入口：注册全部随包技能，且每个技能的 frontmatter 都被正确解析', () => {
   const { ctx, skills } = makeCtx()
   apply(ctx, {})
-  assert.equal(skills.length, 1, '必须注册恰好一个技能')
-  const skill = skills[0]
-  assert.equal(skill.name, 'yibinthesis')
-  assert.ok(skill.description.length > 20, 'description 是模型路由依据，不能为空')
-  assert.ok(skill.whenToUse, 'whenToUse 必须存在（否则注册字段会消失）')
-  assert.ok(skill.content.length > 500, '技能正文必须真的加载到')
-  assert.equal(skill.resourceBase.kind, 'directory')
-  assert.ok(existsSync(join(skill.resourceBase.path, 'SKILL.md')), 'resourceBase 必须指向含 SKILL.md 的目录')
-  assert.ok(!skill.content.startsWith('---'), 'frontmatter 必须从正文里剥掉')
+  // 技能数不再固定为 1：入口枚举 `skills/` 下的全部技能目录（新增技能只需放目录）。
+  assert.ok(skills.length >= 1, '至少要注册一个技能')
+  const names = skills.map((s) => s.name)
+  assert.ok(names.includes('yibinthesis'), `必须注册排版技能，实际：${names.join(', ')}`)
+  for (const skill of skills) {
+    assert.ok(skill.description.length > 20, `${skill.name}：description 是模型路由依据，不能为空`)
+    assert.ok(skill.whenToUse, `${skill.name}：whenToUse 必须存在（否则注册字段会消失）`)
+    assert.ok(skill.content.length > 500, `${skill.name}：技能正文必须真的加载到`)
+    assert.equal(skill.resourceBase.kind, 'directory')
+    assert.ok(
+      existsSync(join(skill.resourceBase.path, 'SKILL.md')),
+      `${skill.name}：resourceBase 必须指向含 SKILL.md 的目录`,
+    )
+    assert.ok(!skill.content.startsWith('---'), `${skill.name}：frontmatter 必须从正文里剥掉`)
+  }
+  // 每个技能的 resourceBase 必须指向**各自**的目录，不能都指到同一个。
+  const bases = new Set(skills.map((s) => s.resourceBase.path))
+  assert.equal(bases.size, skills.length, 'resourceBase 必须一技能一目录')
+})
+
+test('入口：技能缺 description 时必须响亮失败（否则模型发现不了它）', () => {
+  // description 是模型侧路由的唯一依据。静默跳过等于该技能不存在，属静默降级。
+  //
+  // ⚠️ 本测试**必须**写在一次性的临时目录里，绝不能往真实的 `skills/` 里放文件：
+  // 早期版本这么做过，一旦断言中途失败就会把测试目录遗留在随包技能根下，
+  // 使**后续测试**全部读到这个坏技能（实测造成连锁失败）。
+  const root = mkdtempSync(join(tmpdir(), 'ybt-skills-'))
+  const badDir = join(root, 'missing-description')
+  mkdirSync(badDir, { recursive: true })
+  writeFileSync(join(badDir, 'SKILL.md'), '---\nname: missing-description\n---\n\n正文内容。\n', 'utf8')
+  try {
+    assert.throws(() => loadSkillsFrom(root), /缺少 description/, '缺 description 必须抛错')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('入口：缺 SKILL.md 的目录被跳过，但不影响其余技能', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ybt-skills-'))
+  mkdirSync(join(root, 'not-a-skill'), { recursive: true })
+  mkdirSync(join(root, 'good'), { recursive: true })
+  writeFileSync(
+    join(root, 'good', 'SKILL.md'),
+    '---\nname: good\ndescription: 这是一个用于测试的技能描述，长度足够被路由接受。\n---\n\n正文。\n',
+    'utf8',
+  )
+  try {
+    const { skills, skipped } = loadSkillsFrom(root)
+    assert.deepEqual(skills.map((s) => s.name), ['good'], '应只加载有 SKILL.md 的技能')
+    assert.equal(skipped.length, 1, '缺 SKILL.md 的目录应计入 skipped 而不是静默消失')
+    assert.match(skipped[0], /not-a-skill/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('入口：一个技能都没有时必须响亮失败（打包错误）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ybt-skills-'))
+  try {
+    assert.throws(() => loadSkillsFrom(root), /一个都不可用/, '空技能根必须抛错')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('splitFrontmatter：CRLF 与 BOM 下不静默退化', () => {
@@ -226,8 +282,11 @@ test('工具：宿主无 tools 服务时入口降级，而技能照常可用', (
     },
   }
   apply(ctx, {})
-  assert.equal(skills.length, 1, '技能必须仍然注册成功（工具降级不影响技能）')
-  assert.equal(skills[0].name, 'yibinthesis')
+  assert.ok(skills.length >= 1, '技能必须仍然注册成功（工具降级不影响技能）')
+  assert.ok(
+    skills.some((s) => s.name === 'yibinthesis'),
+    `排版技能必须仍在，实际：${skills.map((s) => s.name).join(', ')}`,
+  )
 })
 
 test('工具：定义被拒绝时**抛**，由入口降级为「工具未启用」', () => {
