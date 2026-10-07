@@ -8,13 +8,23 @@
 //   （也作为 node --test 的一个用例运行；装不到 profile 时自动跳过。）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
-const INSTALLED = 'C:/Users/LoyDgIk/.dsh/profiles/desktop/node_modules/yibinthesis-dsh'
+/**
+ * 已安装副本的位置：默认取本机 profile，可用 `YIBINTHESIS_INSTALLED` 覆盖。
+ * 硬编码本机路径会让本测试在其它机器上静默跳过（它本意是校验**安装后**的副本）。
+ */
+const INSTALLED =
+  process.env.YIBINTHESIS_INSTALLED ||
+  join(process.env.USERPROFILE || process.env.HOME || '', '.dsh', 'profiles', 'desktop', 'node_modules', 'yibinthesis-dsh')
 const INSTALLED_ENTRY = `${INSTALLED}/lib/index.js`
 const available = existsSync(INSTALLED_ENTRY)
+
+/** 本仓库根的源码包目录，用于比对「源码有的技能是否都装上了」。 */
+const PACKAGE_SOURCE_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 test('已安装副本：入口可加载、技能可注册、6 个工具可注册', async (t) => {
   if (!available) {
@@ -80,13 +90,25 @@ test('已安装副本：入口可加载、技能可注册、6 个工具可注册
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
 
-  assert.equal(skills.length, 1, '技能必须注册')
-  assert.equal(skills[0].name, 'yibinthesis')
-  assert.ok(skills[0].content.length > 500, '技能正文必须加载到')
-  assert.ok(
-    existsSync(`${skills[0].resourceBase.path}/SKILL.md`),
-    `技能的 resourceBase 必须指向含 SKILL.md 的目录，实际：${skills[0].resourceBase.path}`,
+  // 技能数不再写死：入口枚举 `skills/` 下的全部技能目录。
+  // 这里断言「在**已安装副本**上枚举到的技能集合」与源码目录一致——
+  // 这样才能发现「新增技能只提交到源码、忘了同步到安装位置」这类缺陷。
+  const sourceSkillDirs = readdirSync(join(PACKAGE_SOURCE_ROOT, 'skills'), { withFileTypes: true })
+    .filter((item) => item.isDirectory())
+    .map((item) => item.name)
+    .sort()
+  assert.deepEqual(
+    skills.map((s) => s.name).sort(),
+    sourceSkillDirs,
+    `已安装副本的技能集合应与源码一致，实际：${skills.map((s) => s.name).join(', ')}`,
   )
+  for (const skill of skills) {
+    assert.ok(skill.content.length > 500, `${skill.name}：技能正文必须加载到`)
+    assert.ok(
+      existsSync(`${skill.resourceBase.path}/SKILL.md`),
+      `${skill.name}：resourceBase 必须指向含 SKILL.md 的目录，实际：${skill.resourceBase.path}`,
+    )
+  }
 
   assert.equal(registered.length, 6, `6 个工具必须注册，实际 ${registered.length}：${registered.map((x) => x.name).join(', ')}`)
   assert.ok(routes.length >= 1, '面板数据桥必须挂到 webServer')
